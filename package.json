@@ -35,7 +35,7 @@
     "electron-builder": "^24.9.1"
   },
   "dependencies": {
-    "node-ssh": "^13.1.0"
+    "node-ssh": "^13.2.1"
   },
   "build": {
     "appId": "com.hsgui.creality.helper",
@@ -49,17 +49,19 @@
       "assets/**/*",
       "package.json"
     ],
-        "win": {
-          "target": "nsis",
-          "icon": "assets/icon.png"
-        },
-        "linux": {
-          "target": "AppImage",
-          "icon": "assets/icon.png"
-        },
-        "mac": {
-          "target": "dmg",
-          "icon": "assets/icon.png"
-        }
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.png"
+    }
   }
 }
