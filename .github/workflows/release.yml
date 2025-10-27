@@ -1,0 +1,115 @@
+name: 🚀 Release HSGUI
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Версия релиза (например: v0.1.0-alpha)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            platform: win
+            artifact-name: hsgui-windows
+          - os: ubuntu-latest
+            platform: linux
+            artifact-name: hsgui-linux
+          - os: macos-latest
+            platform: mac
+            artifact-name: hsgui-macos
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔨 Build for ${{ matrix.platform }}
+        run: npm run dist:${{ matrix.platform }}
+
+      - name: 📤 Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}-${{ github.ref_name }}
+          path: dist/
+          retention-days: 30
+
+  create-release:
+    needs: release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📥 Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: 🏷️ Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📋 Prepare release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << EOF
+          ## 🎉 HSGUI ${{ steps.version.outputs.version }}
+          
+          ### 📦 Скачать:
+          - **Windows**: \`hsgui-windows-${{ steps.version.outputs.version }}.zip\`
+          - **Linux**: \`hsgui-linux-${{ steps.version.outputs.version }}.zip\`
+          - **macOS**: \`hsgui-macos-${{ steps.version.outputs.version }}.zip\`
+          
+          ### 🚀 Изменения:
+          - См. [CHANGELOG.md](CHANGELOG.md) для подробного списка изменений
+          
+          ### 📋 Установка:
+          1. Скачайте архив для вашей платформы
+          2. Распакуйте архив
+          3. Запустите приложение
+          
+          ### 🖥️ Поддерживаемые платформы:
+          - Windows 10/11 (x64)
+          - Linux (x64) - Ubuntu 18.04+, Debian 10+
+          - macOS 10.15+ (Intel/Apple Silicon)
+          EOF
+
+      - name: 🚀 Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: HSGUI ${{ steps.version.outputs.version }}
+          body_path: release_notes.md
+          files: |
+            artifacts/hsgui-windows-${{ steps.version.outputs.version }}/*.exe
+            artifacts/hsgui-linux-${{ steps.version.outputs.version }}/*.AppImage
+            artifacts/hsgui-macos-${{ steps.version.outputs.version }}/*.dmg
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, 'alpha') || contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
