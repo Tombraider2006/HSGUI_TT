@@ -59,9 +59,5 @@
       "target": "AppImage",
       "icon": "assets/icon.png"
     },
-    "mac": {
-      "target": "dmg",
-      "icon": "assets/icon.png"
-    }
   }
 }

@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest]
         include:
           - os: windows-latest
             platform: win
@@ -24,9 +24,6 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             artifact-name: hsgui-linux
-          - os: macos-latest
-            platform: mac
-            artifact-name: hsgui-macos
 
     steps:
       - name: 📥 Checkout
@@ -83,7 +80,6 @@ jobs:
           ### 📦 Скачать:
           - **Windows**: \`hsgui-windows-${{ steps.version.outputs.version }}.zip\`
           - **Linux**: \`hsgui-linux-${{ steps.version.outputs.version }}.zip\`
-          - **macOS**: \`hsgui-macos-${{ steps.version.outputs.version }}.zip\`
           
           ### 🚀 Изменения:
           - См. [CHANGELOG.md](CHANGELOG.md) для подробного списка изменений
@@ -96,7 +92,6 @@ jobs:
           ### 🖥️ Поддерживаемые платформы:
           - Windows 10/11 (x64)
           - Linux (x64) - Ubuntu 18.04+, Debian 10+
-          - macOS 10.15+ (Intel/Apple Silicon)
           EOF
 
       - name: 🚀 Create Release
@@ -108,7 +103,6 @@ jobs:
           files: |
             artifacts/hsgui-windows-${{ steps.version.outputs.version }}/*.exe
             artifacts/hsgui-linux-${{ steps.version.outputs.version }}/*.AppImage
-            artifacts/hsgui-macos-${{ steps.version.outputs.version }}/*.dmg
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, 'alpha') || contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'rc') }}
         env:
