@@ -1,6 +1,6 @@
 {
   "name": "hsgui",
-  "version": "0.1.0.01",
+  "version": "0.1.1",
   "description": "HSGUI - Helper Script GUI для управления Creality 3D-принтерами",
   "main": "src/main.js",
   "scripts": {
@@ -49,17 +49,17 @@
       "assets/**/*",
       "package.json"
     ],
-    "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "assets/icon.png"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "assets/icon.icns"
-    }
+        "win": {
+          "target": "nsis",
+          "icon": "assets/icon.png"
+        },
+        "linux": {
+          "target": "AppImage",
+          "icon": "assets/icon.png"
+        },
+        "mac": {
+          "target": "dmg",
+          "icon": "assets/icon.png"
+        }
   }
 }
