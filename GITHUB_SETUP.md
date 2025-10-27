@@ -3,7 +3,7 @@
 ## Создание репозитория
 
 1. **Создайте новый репозиторий** на GitHub:
-   - Название: `hsgui`
+   - Название: `HSGUI_TT`
    - Описание: `HSGUI - Helper Script GUI для управления Creality 3D-принтерами`
    - Публичный репозиторий
    - Не инициализируйте с README (у нас уже есть)
@@ -14,7 +14,7 @@ git init
 git add .
 git commit -m "Initial commit: HSGUI v0.1.0-alpha"
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/hsgui.git
+git remote add origin https://github.com/Tombraider2006/HSGUI_TT.git
 git push -u origin main
 ```
 

@@ -47,10 +47,10 @@ gh auth login
 
 ```bash
 # Создать репозиторий (если еще не создан)
-gh repo create hsgui --public --description "HSGUI - Helper Script GUI для управления Creality 3D-принтерами"
+gh repo create HSGUI_TT --public --description "HSGUI - Helper Script GUI для управления Creality 3D-принтерами"
 
 # Или подключить существующий
-gh repo clone YOUR_USERNAME/hsgui
+gh repo clone Tombraider2006/HSGUI_TT
 ```
 
 ## Создание релизов
