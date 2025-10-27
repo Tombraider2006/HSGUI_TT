@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';">
+    <title>Creality Helper Simple</title>
+    <link rel="stylesheet" href="./styles.css">
+    <style>
+        /* Inline styles for dynamic content only */
+        .help-modal { display: none; }
+        .help-modal.show { display: flex; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🔧 Creality Helper</h1>
+            
+            <div class="status-bar">
+                <div class="status-item">
+                    <div class="status-indicator" id="connectionStatus"></div>
+                    <span id="connectionText">Отключен</span>
+                </div>
+                <div class="status-item">
+                    <span>Модель:</span>
+                    <select id="headerModelSelector" class="header-model-selector" onchange="changeHeaderModel()">
+                        <option value="auto" data-i18n="install.auto_detect">Автоопределение</option>
+                        <option value="k1" data-i18n="models.k1">K1</option>
+                        <option value="k1-max" data-i18n="models.k1-max">K1 Max</option>
+                        <option value="k1c" data-i18n="models.k1c">K1C</option>
+                        <option value="k1se" data-i18n="models.k1se">K1SE</option>
+                        <option value="k1s" data-i18n="models.k1s">K1S</option>
+                        <option value="ender-3-v3" data-i18n="models.ender-3-v3">Ender-3 V3</option>
+                        <option value="ender-3-v3-se" data-i18n="models.ender-3-v3-se">Ender-3 V3 SE</option>
+                        <option value="ender-3-v3-ke" data-i18n="models.ender-3-v3-ke">Ender-3 V3 KE</option>
+                        <option value="e5m" data-i18n="models.e5m">Ender 5 Max</option>
+                    </select>
+                </div>
+                <div class="status-item">
+                    <button class="btn btn-sm btn-primary" onclick="autoDetectPrinter()" id="detectBtn">
+                        🔍 <span data-i18n="main.auto_detect">Автоопределение</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Language Selector -->
+        <div class="language-selector">
+            <button class="lang-btn active" onclick="setLanguage('ru')">🇷🇺 RU</button>
+            <button class="lang-btn" onclick="setLanguage('en')">🇺🇸 EN</button>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Main Navigation Group -->
+                <div class="nav-group">
+                    <a href="#" class="nav-item active" onclick="showPage('main')">
+                        <i>🏠</i>
+                        <span data-i18n="nav.main">Главная</span>
+                    </a>
+                </div>
+                
+                <!-- Components Group -->
+                <div class="nav-group">
+                    <div class="nav-group-title" data-i18n="nav.components">Компоненты</div>
+                    <a href="#" class="nav-item" onclick="showPage('install')">
+                        <i>📦</i>
+                        <span data-i18n="nav.install">Установка</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="showPage('remove')">
+                        <i>🗑️</i>
+                        <span data-i18n="nav.remove">Удаление</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="showPage('customize')">
+                        <i>⚙️</i>
+                        <span data-i18n="nav.customize">Настройка</span>
+                    </a>
+                </div>
+                
+                <!-- Tools Group -->
+                <div class="nav-group">
+                    <div class="nav-group-title" data-i18n="nav.tools_group">Инструменты</div>
+                    <a href="#" class="nav-item" onclick="showPage('backup')">
+                        <i>💾</i>
+                        <span data-i18n="nav.backup">Резервная копия</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="showPage('tools')">
+                        <i>🔧</i>
+                        <span data-i18n="nav.tools">Инструменты</span>
+                    </a>
+                </div>
+                
+                <!-- Info Group -->
+                <div class="nav-group">
+                    <a href="#" class="nav-item" onclick="showPage('info')">
+                        <i>ℹ️</i>
+                        <span data-i18n="nav.info">Информация</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Content Area -->
+            <div class="content">
+                <!-- Main Page -->
+                <div id="mainPage" class="page active">
+                    <h2 data-i18n="main.title">Добро пожаловать в Creality Helper Simple</h2>
+                    <p data-i18n="main.description">Простое и интуитивное управление вашим 3D-принтером Creality</p>
+                    
+                    <!-- Connection Form -->
+                    <div class="connection-form">
+                        <h3 data-i18n="main.connection">🔌 Подключение к принтеру</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label data-i18n="main.ip">IP адрес принтера:</label>
+                                <input type="text" id="printerIP" placeholder="192.168.1.100" value="192.168.1.100">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="main.port">Порт:</label>
+                                <input type="number" id="printerPort" placeholder="22" value="22">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label data-i18n="main.username">Имя пользователя:</label>
+                                <input type="text" id="printerUser" placeholder="root" value="root">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="main.password">Пароль:</label>
+                                <input type="password" id="printerPass" placeholder="creality_2023" value="creality_2023">
+                            </div>
+                        </div>
+                        <div style="text-align: center; margin-top: 20px;">
+                            <button class="btn btn-primary" onclick="connectToPrinter()" data-i18n="main.connect">Подключиться</button>
+                            <button class="btn btn-warning" onclick="clearSSHKeys()" data-i18n="main.clear_ssh">🔑 Очистить SSH</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Install Page -->
+                <div id="installPage" class="page">
+                    <h2 data-i18n="install.title">📦 Установка компонентов</h2>
+                    <p data-i18n="install.description">Выберите компоненты для установки на ваш принтер</p>
+                    
+                    <!-- Model Selector -->
+                    <div style="margin-bottom: 20px;">
+                        <label data-i18n="install.model">Модель принтера:</label>
+                        <select id="modelSelector" class="model-selector" onchange="changeModel()">
+                            <option value="auto" data-i18n="install.auto_detect">Автоопределение</option>
+                            <option value="k1" data-i18n="models.k1">K1</option>
+                            <option value="k1-max" data-i18n="models.k1-max">K1 Max</option>
+                            <option value="k1c" data-i18n="models.k1c">K1C</option>
+                            <option value="k1se" data-i18n="models.k1se">K1SE</option>
+                            <option value="k1s" data-i18n="models.k1s">K1S</option>
+                            <option value="ender-3-v3" data-i18n="models.ender-3-v3">Ender-3 V3</option>
+                            <option value="ender-3-v3-se" data-i18n="models.ender-3-v3-se">Ender-3 V3 SE</option>
+                            <option value="ender-3-v3-ke" data-i18n="models.ender-3-v3-ke">Ender-3 V3 KE</option>
+                            <option value="e5m" data-i18n="models.e5m">Ender 5 Max</option>
+                        </select>
+                    </div>
+
+                    <!-- Batch Install Section -->
+                    <div class="batch-section">
+                        <div class="batch-stats">
+                            <span data-i18n="install.selected">Выбрано:</span> <span id="selectedCount">0</span> / <span id="totalCount">0</span>
+                        </div>
+                        <div class="batch-buttons">
+                            <button class="btn btn-primary" onclick="selectAllComponents()" data-i18n="install.select_all">Выбрать все</button>
+                            <button class="btn btn-warning" onclick="selectNoneComponents()" data-i18n="install.select_none">Снять выделение</button>
+                            <button class="btn btn-success" onclick="installSelectedComponents()" data-i18n="install.install_selected">Установить выбранные</button>
+                        </div>
+                    </div>
+
+                    <!-- Installation Log -->
+                    <div id="installLog" class="install-log" style="display: none;">
+                        <h3 data-i18n="install.log_title">📋 Лог установки</h3>
+                        <div id="installLogContent" class="log-content">
+                            <!-- Log messages will appear here -->
+                        </div>
+                        <button class="btn btn-sm btn-secondary" onclick="clearInstallLog()" data-i18n="install.clear_log">Очистить лог</button>
+                    </div>
+
+                    <!-- Components Grid -->
+                    <div id="componentsGrid" class="components-grid">
+                        <!-- Components will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Remove Page -->
+                <div id="removePage" class="page">
+                    <h2 data-i18n="remove.title">🗑️ Удаление компонентов</h2>
+                    <p data-i18n="remove.description">Удалите установленные компоненты с принтера</p>
+                    
+                    <!-- Batch Remove Section -->
+                    <div class="batch-section">
+                        <div class="batch-stats">
+                            <span data-i18n="remove.selected">Выбрано для удаления:</span> <span id="removeSelectedCount">0</span> / <span id="removeTotalCount">0</span>
+                        </div>
+                        <div class="batch-buttons">
+                            <button class="btn btn-primary" onclick="selectAllInstalled()" data-i18n="remove.select_all">Выбрать все</button>
+                            <button class="btn btn-warning" onclick="selectNoneInstalled()" data-i18n="remove.select_none">Снять выделение</button>
+                            <button class="btn btn-danger" onclick="removeSelectedComponents()" data-i18n="remove.remove_selected">Удалить выбранные</button>
+                        </div>
+                    </div>
+
+                    <!-- Removal Log -->
+                    <div id="removeLog" class="install-log" style="display: none;">
+                        <h3 data-i18n="remove.log_title">📋 Лог удаления</h3>
+                        <div id="removeLogContent" class="log-content">
+                            <!-- Log messages will appear here -->
+                        </div>
+                        <button class="btn btn-sm btn-secondary" onclick="clearRemoveLog()" data-i18n="remove.clear_log">Очистить лог</button>
+                    </div>
+                    
+                    <div id="installedComponents" class="components-grid">
+                        <!-- Installed components will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Customize Page -->
+                <div id="customizePage" class="page">
+                    <h2 data-i18n="customize.title">⚙️ Настройка компонентов</h2>
+                    <p data-i18n="customize.description">Настройте параметры установленных компонентов</p>
+                    
+                    <!-- System Tools Grid -->
+                    <div class="tools-grid">
+                        <!-- System Information -->
+                        <div class="tool-card" onclick="showSystemInfo()">
+                            <h3>📊 <span data-i18n="customize.system_info">Информация о системе</span></h3>
+                            <p data-i18n="customize.system_info_desc">Просмотр информации о принтере и системе</p>
+                        </div>
+                        
+                        <!-- Logs Viewer -->
+                        <div class="tool-card" onclick="showLogsViewer()">
+                            <h3>📋 <span data-i18n="customize.logs">Просмотр логов</span></h3>
+                            <p data-i18n="customize.logs_desc">Просмотр системных логов и логов Klipper</p>
+                        </div>
+                        
+                        <!-- Service Management -->
+                        <div class="tool-card" onclick="showServiceManager()">
+                            <h3>🔧 <span data-i18n="customize.services">Управление сервисами</span></h3>
+                            <p data-i18n="customize.services_desc">Запуск, остановка и перезапуск сервисов</p>
+                        </div>
+                        
+                        <!-- File Manager -->
+                        <div class="tool-card" onclick="showFileManager()">
+                            <h3>📁 <span data-i18n="customize.files">Файловый менеджер</span></h3>
+                            <p data-i18n="customize.files_desc">Управление файлами конфигурации</p>
+                        </div>
+                        
+                        <!-- Network Tools -->
+                        <div class="tool-card" onclick="showNetworkTools()">
+                            <h3>🌐 <span data-i18n="customize.network">Сетевые инструменты</span></h3>
+                            <p data-i18n="customize.network_desc">Диагностика сети и подключений</p>
+                        </div>
+                        
+                        <!-- Performance Monitor -->
+                        <div class="tool-card" onclick="showPerformanceMonitor()">
+                            <h3>📈 <span data-i18n="customize.performance">Мониторинг производительности</span></h3>
+                            <p data-i18n="customize.performance_desc">Отслеживание использования ресурсов</p>
+                        </div>
+                        
+                    </div>
+                    
+                    <div id="customizeOptions">
+                        <!-- Dynamic content will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Backup Page -->
+                <div id="backupPage" class="page">
+                    <h2 data-i18n="backup.title">💾 Резервная копия</h2>
+                    <p data-i18n="backup.description">Создайте резервную копию конфигурации принтера</p>
+                    <div style="text-align: center; margin: 40px 0;">
+                        <button class="btn btn-primary" onclick="createBackup()" data-i18n="backup.create">Создать резервную копию</button>
+                        <button class="btn btn-warning" onclick="restoreBackup()" data-i18n="backup.restore">Восстановить из резервной копии</button>
+                    </div>
+                </div>
+
+                <!-- Tools Page -->
+                <div id="toolsPage" class="page">
+                    <h2 data-i18n="tools.title">🔧 Инструменты</h2>
+                    <p data-i18n="tools.description">Дополнительные инструменты для работы с принтером</p>
+                    <div class="tools-grid">
+                        <!-- Klipper Configuration Management -->
+                        <div class="tool-card" onclick="preventKlipperUpdates()">
+                            <h3 data-i18n="tools.prevent_klipper">🔒 Предотвратить обновление</h3>
+                            <p data-i18n="tools.prevent_klipper_desc">Конфигурационных файлов Klipper</p>
+                        </div>
+                        <div class="tool-card" onclick="allowKlipperUpdates()">
+                            <h3 data-i18n="tools.allow_klipper">🔓 Разрешить обновление</h3>
+                            <p data-i18n="tools.allow_klipper_desc">Конфигурационных файлов Klipper</p>
+                        </div>
+                        
+                        <!-- Gcode Fix -->
+                        <div class="tool-card" onclick="fixGcodePrinting()">
+                            <h3 data-i18n="tools.fix_gcode">🔧 Исправить печать</h3>
+                            <p data-i18n="tools.fix_gcode_desc">Gcode файлов из папки</p>
+                        </div>
+                        
+                        <!-- Camera Settings -->
+                        <div class="tool-card" onclick="enableCameraSettings()">
+                            <h3 data-i18n="tools.enable_camera">📷 Включить камеру</h3>
+                            <p data-i18n="tools.enable_camera_desc">Настройки камеры в Moonraker</p>
+                        </div>
+                        <div class="tool-card" onclick="disableCameraSettings()">
+                            <h3 data-i18n="tools.disable_camera">📷 Выключить камеру</h3>
+                            <p data-i18n="tools.disable_camera_desc">Настройки камеры в Moonraker</p>
+                        </div>
+                        
+                        <!-- Service Management -->
+                        <div class="tool-card" onclick="restartNginx()">
+                            <h3 data-i18n="tools.restart_nginx">🔄 Перезапустить Nginx</h3>
+                            <p data-i18n="tools.restart_nginx_desc">Сервис Nginx</p>
+                        </div>
+                        <div class="tool-card" onclick="restartMoonraker()">
+                            <h3 data-i18n="tools.restart_moonraker">🔄 Перезапустить Moonraker</h3>
+                            <p data-i18n="tools.restart_moonraker_desc">Сервис Moonraker</p>
+                        </div>
+                        <div class="tool-card" onclick="restartKlipper()">
+                            <h3 data-i18n="tools.restart_klipper">🔄 Перезапустить Klipper</h3>
+                            <p data-i18n="tools.restart_klipper_desc">Сервис Klipper</p>
+                        </div>
+                        
+                        <!-- Entware Update -->
+                        <div class="tool-card" onclick="updateEntware()">
+                            <h3 data-i18n="tools.update_entware">📦 Обновить Entware</h3>
+                            <p data-i18n="tools.update_entware_desc">Пакеты Entware</p>
+                        </div>
+                        
+                        <!-- Cache and Logs -->
+                        <div class="tool-card" onclick="clearCache()">
+                            <h3 data-i18n="tools.clear_cache">🗑️ Очистить кэш</h3>
+                            <p data-i18n="tools.clear_cache_desc">Системный кэш</p>
+                        </div>
+                        <div class="tool-card" onclick="clearLogs()">
+                            <h3 data-i18n="tools.clear_logs">🗑️ Очистить логи</h3>
+                            <p data-i18n="tools.clear_logs_desc">Файлы логов</p>
+                        </div>
+                        
+                        <!-- Firmware Management -->
+                        <div class="tool-card" onclick="restoreFirmware()">
+                            <h3 data-i18n="tools.restore_firmware">🔄 Восстановить прошивку</h3>
+                            <p data-i18n="tools.restore_firmware_desc">Предыдущую версию</p>
+                        </div>
+                        
+                        <!-- Factory Reset -->
+                        <div class="tool-card" onclick="factoryReset()">
+                            <h3 data-i18n="tools.factory_reset">🏭 Сброс к заводским</h3>
+                            <p data-i18n="tools.factory_reset_desc">Настройкам</p>
+                        </div>
+                    </div>
+                    
+                    <div id="toolsOptions">
+                        <!-- Dynamic content will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Info Page -->
+                <div id="infoPage" class="page">
+                    <h2 data-i18n="info.title">ℹ️ Информация о приложении</h2>
+                    <div class="info-grid">
+                        <div class="info-card">
+                            <h3 data-i18n="info.version">Версия</h3>
+                            <p><strong id="appVersion">1.0.0</strong></p>
+                        </div>
+                        <div class="info-card">
+                            <h3 data-i18n="info.author">Автор</h3>
+                            <p><strong><a href="https://github.com/Tombraider2006" target="_blank" rel="noopener">Tom Tomich</a></strong></p>
+                        </div>
+                        <div class="info-card">
+                            <h3 data-i18n="info.license">Лицензия</h3>
+                            <p><strong>MIT</strong></p>
+                        </div>
+                        <div class="info-card">
+                            <h3 data-i18n="info.support">Поддержка</h3>
+                            <p><strong><a href="https://github.com/Tombraider2006" target="_blank" rel="noopener">GitHub Issues</a></strong></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="help-modal">
+        <div class="help-content">
+            <button class="help-close" onclick="closeHelp()">&times;</button>
+            <div id="helpContent">
+                <!-- Help content will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

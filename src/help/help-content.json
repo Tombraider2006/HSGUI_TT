@@ -1,0 +1,220 @@
+{
+  "ru": {
+    "moonraker-nginx": {
+      "title": "Moonraker и Nginx",
+      "description": "Веб-сервер для управления принтером через браузер",
+      "details": "Moonraker - это API сервер для Klipper, который обеспечивает веб-интерфейс для управления принтером. Nginx используется как веб-сервер для обслуживания статических файлов и проксирования запросов к Moonraker.",
+      "features": [
+        "Веб-интерфейс для управления принтером",
+        "API для внешних приложений",
+        "Поддержка WebSocket соединений",
+        "Статический файловый сервер"
+      ],
+      "requirements": [
+        "Klipper должен быть установлен",
+        "Порт 80 должен быть свободен",
+        "Минимум 50MB свободного места"
+      ],
+      "troubleshooting": [
+        {
+          "problem": "Не удается подключиться к веб-интерфейсу",
+          "solution": "Проверьте, что Moonraker запущен и порт 80 свободен"
+        },
+        {
+          "problem": "Ошибка 502 Bad Gateway",
+          "solution": "Перезапустите Moonraker и Nginx"
+        }
+      ]
+    },
+    "fluidd": {
+      "title": "Fluidd",
+      "description": "Современный веб-интерфейс для управления принтером",
+      "details": "Fluidd - это легкий и быстрый веб-интерфейс для Klipper. Предоставляет интуитивно понятный интерфейс для управления печатью, мониторинга состояния принтера и настройки параметров.",
+      "features": [
+        "Современный и отзывчивый интерфейс",
+        "Управление печатью в реальном времени",
+        "Мониторинг температуры и состояния",
+        "Управление файлами и настройками"
+      ],
+      "requirements": [
+        "Moonraker должен быть установлен",
+        "Порт 4408 должен быть свободен",
+        "Современный браузер с поддержкой WebSocket"
+      ],
+      "troubleshooting": [
+        {
+          "problem": "Интерфейс не загружается",
+          "solution": "Проверьте подключение к принтеру и доступность порта 4408"
+        },
+        {
+          "problem": "Не отображается статус принтера",
+          "solution": "Убедитесь, что Moonraker запущен и Klipper подключен"
+        }
+      ]
+    },
+    "kamp": {
+      "title": "Klipper Adaptive Meshing & Purging",
+      "description": "Улучшенная калибровка стола и очистка сопла",
+      "details": "KAMP - это набор макросов для Klipper, который автоматически адаптирует сетку калибровки стола в зависимости от размера печатаемого объекта и обеспечивает эффективную очистку сопла перед началом печати.",
+      "features": [
+        "Адаптивная сетка калибровки стола",
+        "Автоматическая очистка сопла",
+        "Оптимизация времени печати",
+        "Поддержка различных размеров объектов"
+      ],
+      "requirements": [
+        "Klipper с поддержкой макросов",
+        "BLTouch или аналогичный датчик",
+        "Настроенная сетка калибровки стола"
+      ],
+      "troubleshooting": [
+        {
+          "problem": "Сетка калибровки не создается",
+          "solution": "Проверьте настройки BLTouch и конфигурацию Klipper"
+        },
+        {
+          "problem": "Очистка сопла не работает",
+          "solution": "Убедитесь, что макросы очистки правильно настроены"
+        }
+      ]
+    },
+    "buzzer": {
+      "title": "Buzzer Support",
+      "description": "Звуковые оповещения для принтера",
+      "details": "Добавляет поддержку звуковых оповещений через встроенный зуммер принтера. Позволяет настраивать различные звуковые сигналы для уведомлений о завершении печати, ошибках и других событиях.",
+      "features": [
+        "Звуковые уведомления о событиях",
+        "Настраиваемые мелодии",
+        "Интеграция с макросами печати",
+        "Поддержка различных типов сигналов"
+      ],
+      "requirements": [
+        "Принтер с установленным зуммером",
+        "Klipper с поддержкой макросов",
+        "Правильная настройка пинов в конфигурации"
+      ],
+      "troubleshooting": [
+        {
+          "problem": "Зуммер не издает звуков",
+          "solution": "Проверьте подключение зуммера и настройки пинов в Klipper"
+        },
+        {
+          "problem": "Неправильные звуки",
+          "solution": "Проверьте конфигурацию макросов и настройки частоты"
+        }
+      ],
+      "warnings": [
+        "Внимание: В моделях K1S и K1SE зуммер не припаян на плате и требует дополнительной установки"
+      ]
+    }
+  },
+  "en": {
+    "moonraker-nginx": {
+      "title": "Moonraker and Nginx",
+      "description": "Web server for printer control via browser",
+      "details": "Moonraker is an API server for Klipper that provides a web interface for printer control. Nginx is used as a web server to serve static files and proxy requests to Moonraker.",
+      "features": [
+        "Web interface for printer control",
+        "API for external applications",
+        "WebSocket connection support",
+        "Static file server"
+      ],
+      "requirements": [
+        "Klipper must be installed",
+        "Port 80 must be available",
+        "Minimum 50MB free space"
+      ],
+      "troubleshooting": [
+        {
+          "problem": "Cannot connect to web interface",
+          "solution": "Check that Moonraker is running and port 80 is free"
+        },
+        {
+          "problem": "502 Bad Gateway error",
+          "solution": "Restart Moonraker and Nginx"
+        }
+      ]
+    },
+    "fluidd": {
+      "title": "Fluidd",
+      "description": "Modern web interface for printer control",
+      "details": "Fluidd is a lightweight and fast web interface for Klipper. Provides an intuitive interface for print management, printer status monitoring, and parameter configuration.",
+      "features": [
+        "Modern and responsive interface",
+        "Real-time print control",
+        "Temperature and status monitoring",
+        "File and settings management"
+      ],
+      "requirements": [
+        "Moonraker must be installed",
+        "Port 4408 must be available",
+        "Modern browser with WebSocket support"
+      ],
+      "troubleshooting": [
+        {
+          "problem": "Interface not loading",
+          "solution": "Check printer connection and port 4408 availability"
+        },
+        {
+          "problem": "Printer status not displayed",
+          "solution": "Ensure Moonraker is running and Klipper is connected"
+        }
+      ]
+    },
+    "kamp": {
+      "title": "Klipper Adaptive Meshing & Purging",
+      "description": "Improved bed calibration and nozzle cleaning",
+      "details": "KAMP is a set of macros for Klipper that automatically adapts the bed calibration mesh based on the size of the printed object and provides efficient nozzle cleaning before starting the print.",
+      "features": [
+        "Adaptive bed calibration mesh",
+        "Automatic nozzle cleaning",
+        "Print time optimization",
+        "Support for various object sizes"
+      ],
+      "requirements": [
+        "Klipper with macro support",
+        "BLTouch or similar sensor",
+        "Configured bed calibration mesh"
+      ],
+      "troubleshooting": [
+        {
+          "problem": "Calibration mesh not created",
+          "solution": "Check BLTouch settings and Klipper configuration"
+        },
+        {
+          "problem": "Nozzle cleaning not working",
+          "solution": "Ensure cleaning macros are properly configured"
+        }
+      ]
+    },
+    "buzzer": {
+      "title": "Buzzer Support",
+      "description": "Audio notifications for printer",
+      "details": "Adds support for audio notifications through the printer's built-in buzzer. Allows configuring various sound signals for print completion notifications, errors, and other events.",
+      "features": [
+        "Audio notifications for events",
+        "Configurable melodies",
+        "Integration with print macros",
+        "Support for various signal types"
+      ],
+      "requirements": [
+        "Printer with installed buzzer",
+        "Klipper with macro support",
+        "Proper pin configuration in settings"
+      ],
+      "troubleshooting": [
+        {
+          "problem": "Buzzer not making sounds",
+          "solution": "Check buzzer connection and pin settings in Klipper"
+        },
+        {
+          "problem": "Incorrect sounds",
+          "solution": "Check macro configuration and frequency settings"
+        }
+      ],
+      "warnings": [
+        "Warning: In K1S and K1SE models, the buzzer is not soldered on the board and requires additional installation"
+      ]
+    }
+  }
+}

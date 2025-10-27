@@ -1,0 +1,63 @@
+{
+  "name": "hsgui",
+  "version": "0.1.0-alpha",
+  "description": "HSGUI - Helper Script GUI для управления Creality 3D-принтерами",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "dist": "npm run build",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
+    "dist:mac": "electron-builder --mac",
+    "release:win": "npm run dist:win && echo 'Windows release готов в папке dist/'",
+    "release:linux": "npm run dist:linux && echo 'Linux release готов в папке dist/'",
+    "release:mac": "npm run dist:mac && echo 'macOS release готов в папке dist/'",
+    "release:all": "npm run dist:win && npm run dist:linux && npm run dist:mac && echo 'Все релизы готовы в папке dist/'",
+    "github:release": "node -e \"const os=require('os'); const script=os.platform()==='win32'?'scripts/github-release.bat':'scripts/github-release.sh'; require('child_process').exec(script, (err,stdout,stderr)=>{console.log(stdout); if(err)console.error(stderr); process.exit(err?1:0);});\"",
+    "github:release:win": "scripts\\github-release.bat",
+    "github:release:linux": "./scripts/github-release.sh",
+    "github:release:mac": "./scripts/github-release.sh"
+  },
+  "keywords": [
+    "creality",
+    "3d-printer",
+    "firmware",
+    "gui"
+  ],
+  "author": "Creality Helper Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "node-ssh": "^13.1.0"
+  },
+  "build": {
+    "appId": "com.hsgui.creality.helper",
+    "productName": "HSGUI - Creality Helper",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "scripts/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.png"
+    }
+  }
+}

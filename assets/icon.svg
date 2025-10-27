@@ -1,0 +1,29 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="128" cy="128" r="120" fill="#1e40af" stroke="#1e3a8a" stroke-width="8"/>
+  
+  <!-- 3D Printer icon -->
+  <g transform="translate(64, 64)">
+    <!-- Printer base -->
+    <rect x="20" y="80" width="88" height="40" rx="4" fill="#ffffff"/>
+    
+    <!-- Printer frame -->
+    <rect x="16" y="20" width="96" height="60" rx="4" fill="#ffffff" stroke="#1e40af" stroke-width="2"/>
+    
+    <!-- Print bed -->
+    <rect x="24" y="24" width="80" height="52" rx="2" fill="#f3f4f6"/>
+    
+    <!-- Print head -->
+    <circle cx="64" cy="40" r="6" fill="#ef4444"/>
+    <rect x="60" y="36" width="8" height="8" fill="#ef4444"/>
+    
+    <!-- Print object -->
+    <rect x="48" y="48" width="32" height="20" rx="2" fill="#10b981"/>
+    
+    <!-- Status indicator -->
+    <circle cx="200" cy="40" r="8" fill="#10b981"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="128" y="200" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="16" font-weight="bold">Creality Helper</text>
+</svg>
