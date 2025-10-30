@@ -2,7 +2,7 @@
 
 /**
  * Скрипт для автоматического увеличения версии
- * Увеличивает patch версию на 0.01 при каждом коммите
+ * Увеличивает patch версию (целочисленно) при каждом коммите
  */
 
 const fs = require('fs');
@@ -18,10 +18,10 @@ try {
     const versionParts = packageJson.version.split('.');
     const major = parseInt(versionParts[0]) || 0;
     const minor = parseInt(versionParts[1]) || 0;
-    const patch = parseFloat(versionParts[2]) || 0;
+    const patch = parseInt(versionParts[2], 10) || 0;
     
-    // Увеличиваем patch версию на 0.01
-    const newPatch = (patch + 0.01).toFixed(2);
+    // Увеличиваем patch версию на 1
+    const newPatch = patch + 1;
     const newVersion = `${major}.${minor}.${newPatch}`;
     
     // Обновляем версию

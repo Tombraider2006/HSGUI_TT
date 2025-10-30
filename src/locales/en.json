@@ -20,13 +20,13 @@
     "password": "Password:",
     "connect": "Connect",
     "clear_ssh": "🔑 Clear SSH",
-    "auto_detect": "Auto-detect"
+    "auto_detect": "Auto-detect",
+    "model_label": "Model:"
   },
   "install": {
     "title": "📦 Install Components",
     "description": "Select components to install on your printer",
     "model": "Printer model:",
-    "auto_detect": "Auto-detect",
     "selected": "Selected:",
     "select_all": "Select All",
     "select_none": "Deselect All",
@@ -87,14 +87,14 @@
       "active": "Active",
       "inactive": "Inactive"
     },
-    "logs": {
+    "logs_labels": {
       "klipper": "Klipper Logs",
       "moonraker": "Moonraker Logs",
       "system": "System Logs",
       "clear": "Clear",
       "select_log_type": "Select log type to view"
     },
-    "services": {
+    "services_labels": {
       "klipper": "Klipper",
       "moonraker": "Moonraker",
       "nginx": "Nginx",
@@ -103,19 +103,19 @@
       "stop": "Stop",
       "restart": "Restart"
     },
-    "files": {
+    "files_labels": {
       "config_files": "Show Config Files",
       "log_files": "Show Log Files",
       "clear": "Clear",
       "select_action": "Select action to view files"
     },
-    "network": {
+    "network_labels": {
       "diagnostics": "Network Diagnostics",
       "info": "Network Info",
       "test_connection": "Test Connection",
       "select_action": "Select action for network diagnostics"
     },
-    "performance": {
+    "performance_labels": {
       "system_stats": "System Stats",
       "memory_usage": "Memory Usage",
       "disk_usage": "Disk Usage",
@@ -227,6 +227,17 @@
     "core": "Core",
     "remote": "Remote Control",
     "tools": "Tools",
-    "customization": "Customization"
+    "customization": "Customization",
+    "klipper": "Klipper",
+    "hardware": "Hardware",
+    "backup": "Backup",
+    "camera": "Camera",
+    "ui": "User Interface",
+    "mobile": "Mobile Apps"
+  },
+  "dev_console": {
+    "clear": "Clear",
+    "hide": "Hide",
+    "toggle": "🧪 Logs"
   }
 }

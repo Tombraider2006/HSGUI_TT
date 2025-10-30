@@ -14,9 +14,9 @@ function createWindow() {
     minWidth: 1000,
     minHeight: 700,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      enableRemoteModule: true
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
     },
     icon: path.join(__dirname, '../assets/icon.png'),
     titleBarStyle: 'default',
@@ -56,6 +56,9 @@ app.on('activate', () => {
     createWindow();
   }
 });
+
+// App meta
+ipcMain.handle('get-app-version', async () => app.getVersion());
 
 // IPC обработчики для SSH
 ipcMain.handle('ssh-connect', async (event, connection) => {

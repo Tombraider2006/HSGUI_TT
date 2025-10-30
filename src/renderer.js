@@ -1,9 +1,6 @@
-const { ipcRenderer } = require('electron');
-
-// Check if ipcRenderer is available
-if (!ipcRenderer) {
-    console.error('ipcRenderer is not available');
-}
+// Electron API is exposed via preload with contextIsolation
+// Use var to avoid redeclaration crash if script is injected twice
+var electronAPI = (typeof window !== 'undefined' && window.electronAPI) ? window.electronAPI : null;
 
 let isConnected = false;
 let currentLanguage = 'ru';
@@ -12,11 +9,15 @@ let appVersion = '1.0.0'; // Default version
 let selectedComponents = new Set();
 let selectedForRemoval = new Set();
 
+// Optional archive URL to bootstrap scripts on printer via wget (tar.gz preferred)
+// Leave empty to ask user each time.
+const SCRIPTS_ARCHIVE_URL_DEFAULT = '';
+
 // Load translations
 async function loadTranslations(lang) {
     try {
         // Load translations from the correct path
-        const response = await fetch(`./src/locales/${lang}.json`);
+        const response = await fetch(`./locales/${lang}.json`);
                 if (response.ok) {
                     translations[lang] = await response.json();
         } else {
@@ -29,113 +30,127 @@ async function loadTranslations(lang) {
     }
 }
 
-// Fallback translations if files can't be loaded
+// -------- Logger & Diagnostics --------
+const diagnostics = (function createDiagnostics() {
+    const state = {
+        logs: [],
+        level: 'info',
+        enabled: true,
+        maxEntries: 1000,
+        startedAt: new Date().toISOString()
+    };
+
+    function push(entry) {
+        state.logs.push(entry);
+        if (state.logs.length > state.maxEntries) state.logs.shift();
+        const el = document.getElementById('devConsoleContent');
+        if (el) {
+            const line = document.createElement('div');
+            line.className = `log-item ${entry.level}`;
+            line.textContent = `[${entry.ts}] [${entry.level.toUpperCase()}] ${entry.msg}`;
+            el.appendChild(line);
+            el.scrollTop = el.scrollHeight;
+        }
+    }
+
+    function log(level, msg) {
+        const entry = { level, msg, ts: new Date().toISOString() };
+        push(entry);
+    }
+
+    // Wrap console
+    const original = {
+        log: console.log,
+        warn: console.warn,
+        error: console.error,
+        info: console.info
+    };
+
+    console.log = (...args) => { original.log.apply(console, args); log('info', args.map(String).join(' ')); };
+    console.info = (...args) => { original.info.apply(console, args); log('info', args.map(String).join(' ')); };
+    console.warn = (...args) => { original.warn.apply(console, args); log('warn', args.map(String).join(' ')); };
+    console.error = (...args) => { original.error.apply(console, args); log('error', args.map(String).join(' ')); };
+
+    // Global error hooks
+    window.addEventListener('error', (e) => {
+        log('error', `Uncaught: ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`);
+        setHealth(false, `JS Error: ${e.message}`);
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+        log('error', `Unhandled promise rejection: ${e.reason}`);
+        setHealth(false, `Promise Rejection`);
+    });
+
+    // Health indicator control
+    function setHealth(ok, message) {
+        const badge = document.getElementById('healthBadge');
+        const text = document.getElementById('healthText');
+        if (badge) {
+            badge.className = `health-badge ${ok ? 'ok' : 'bad'}`;
+        }
+        if (text) {
+            text.textContent = ok ? 'OK' : (message || 'Issues');
+        }
+    }
+
+    function runSelfChecks() {
+        const results = [];
+        function ok(name, pass, msg) { results.push({ name, pass, msg }); if (!pass) setHealth(false, name); }
+
+        // electronAPI available
+        ok('preload:eapi', !!(window && window.electronAPI), 'preload not wired');
+        // required functions attached to window for inline handlers
+        const required = [
+            'showPage','setLanguage','changeModel','changeHeaderModel','selectAllComponents','selectNoneComponents','installSelectedComponents',
+            'selectAllInstalled','selectNoneInstalled','removeSelectedComponents','connectToPrinter','clearSSHKeys','autoDetectPrinter',
+            'showSystemInfo','showLogsViewer','showServiceManager','showFileManager','showNetworkTools','showPerformanceMonitor',
+            'createBackup','restoreBackup','preventKlipperUpdates','allowKlipperUpdates','fixGcodePrinting','enableCameraSettings',
+            'disableCameraSettings','restartNginx','restartMoonraker','restartKlipper','updateEntware','clearCache','clearLogs',
+            'restoreFirmware','factoryReset','closeHelp'
+        ];
+        required.forEach(fn => ok(`export:${fn}`, typeof window[fn] === 'function', 'not exported'));
+
+        // translations loaded
+        ok('i18n:ru', !!translations['ru'], 'ru not loaded');
+        ok('i18n:en', !!translations['en'], 'en not loaded');
+
+        // DOM essentials
+        ok('dom:pages', !!document.querySelector('.page'), 'pages not found');
+
+        const allPass = results.every(r => r.pass);
+        setHealth(allPass, allPass ? 'OK' : 'Issues');
+        console.info('Self-check results:', results);
+        return results;
+    }
+
+    return { log, push, setHealth, runSelfChecks };
+})();
+
+// Minimal fallback translations if files can't be loaded
 function getFallbackTranslations(lang) {
     if (lang === 'ru') {
         return {
-            nav: { 
-                main: "Главная", 
-                install: "Установка", 
-                remove: "Удаление", 
-                customize: "Настройка", 
-                backup: "Резервная копия", 
-                tools: "Инструменты", 
-                info: "Информация",
-                components: "Компоненты",
-                tools_group: "Инструменты"
-            },
-            main: { 
-                title: "Добро пожаловать в Creality Helper", 
-                description: "Простое и интуитивное управление вашим 3D-принтером Creality", 
-                connection: "🔌 Подключение к принтеру", 
-                ip: "IP адрес принтера:", 
-                port: "Порт:", 
-                username: "Имя пользователя:", 
-                password: "Пароль:", 
-                connect: "Подключиться", 
-                clear_ssh: "🔑 Очистить SSH",
-                auto_detect: "Автоопределение"
-            },
-            install: { title: "📦 Установка компонентов", description: "Выберите компоненты для установки на ваш принтер", model: "Модель принтера:", auto_detect: "Автоопределение", selected: "Выбрано:", select_all: "Выбрать все", select_none: "Снять выделение", install_selected: "Установить выбранные" },
-            remove: { 
-                title: "🗑️ Удаление компонентов", 
-                description: "Удалите установленные компоненты с принтера",
-                selected: "Выбрано для удаления:",
-                select_all: "Выбрать все",
-                select_none: "Снять выделение",
-                remove_selected: "Удалить выбранные",
-                no_installed: "Нет установленных компонентов",
-                checking_components: "Проверка установленных компонентов...",
-                remove_success: "Компонент успешно удален",
-                remove_error: "Ошибка удаления компонента",
-                confirm_remove: "Вы уверены, что хотите удалить выбранные компоненты?",
-                removing: "Удаление компонентов..."
-            },
-            customize: { 
-                title: "⚙️ Настройка компонентов", 
-                description: "Настройте параметры установленных компонентов",
-                system_info: "Информация о системе",
-                system_info_desc: "Просмотр информации о принтере и системе",
-                logs: "Просмотр логов",
-                logs_desc: "Просмотр системных логов и логов Klipper",
-                services: "Управление сервисами",
-                services_desc: "Запуск, остановка и перезапуск сервисов",
-                files: "Файловый менеджер",
-                files_desc: "Управление файлами конфигурации",
-                network: "Сетевые инструменты",
-                network_desc: "Диагностика сети и подключений",
-                performance: "Мониторинг производительности",
-                performance_desc: "Отслеживание использования ресурсов",
-            },
-            backup: { title: "💾 Резервная копия", description: "Создайте резервную копию конфигурации принтера", create: "Создать резервную копию", restore: "Восстановить из резервной копии" },
-            tools: { 
-                title: "🔧 Инструменты", 
-                description: "Дополнительные инструменты для работы с принтером",
-                prevent_klipper: "🔒 Предотвратить обновление",
-                prevent_klipper_desc: "Конфигурационных файлов Klipper",
-                allow_klipper: "🔓 Разрешить обновление",
-                allow_klipper_desc: "Конфигурационных файлов Klipper",
-                fix_gcode: "🔧 Исправить печать",
-                fix_gcode_desc: "Gcode файлов из папки",
-                enable_camera: "📷 Включить камеру",
-                enable_camera_desc: "Настройки камеры в Moonraker",
-                disable_camera: "📷 Выключить камеру",
-                disable_camera_desc: "Настройки камеры в Moonraker",
-                restart_nginx: "🔄 Перезапустить Nginx",
-                restart_nginx_desc: "Сервис Nginx",
-                restart_moonraker: "🔄 Перезапустить Moonraker",
-                restart_moonraker_desc: "Сервис Moonraker",
-                restart_klipper: "🔄 Перезапустить Klipper",
-                restart_klipper_desc: "Сервис Klipper",
-                update_entware: "📦 Обновить Entware",
-                update_entware_desc: "Пакеты Entware",
-                clear_cache: "🗑️ Очистить кэш",
-                clear_cache_desc: "Системный кэш",
-                clear_logs: "🗑️ Очистить логи",
-                clear_logs_desc: "Файлы логов",
-                restore_firmware: "🔄 Восстановить прошивку",
-                restore_firmware_desc: "Предыдущую версию",
-                factory_reset: "🏭 Сброс к заводским",
-                factory_reset_desc: "Настройкам"
-            },
-            info: { title: "ℹ️ Информация о приложении", version: "Версия", author: "Автор", license: "Лицензия", support: "Поддержка" },
-            models: { k1: "K1", "k1-max": "K1 Max", k1c: "K1C", k1se: "K1SE", k1s: "K1S", "ender-3-v3": "Ender-3 V3", "ender-3-v3-se": "Ender-3 V3 SE", "ender-3-v3-ke": "Ender-3 V3 KE", e5m: "Ender 5 Max" },
-            messages: { connection_success: "Успешно подключено к принтеру!", connection_error: "Ошибка подключения", model_detected: "Обнаружена модель:", model_undefined: "Модель принтера не определена", select_components: "Выберите компоненты для установки", connect_first: "Сначала подключитесь к принтеру", installation_complete: "Установка завершена!", backup_created: "Резервная копия создана успешно", backup_restored: "Резервная копия восстановлена успешно", connected: "Подключено", disconnected: "Отключен" },
-            categories: { core: "Основные", remote: "Удаленное управление", tools: "Инструменты", customization: "Настройка" }
+            nav: { main: "Главная", install: "Установка", remove: "Удаление", customize: "Настройка", backup: "Резервная копия", tools: "Инструменты", info: "Информация" },
+            main: { title: "Creality Helper", connection: "Подключение к принтеру", connect: "Подключиться" },
+            install: { title: "Установка компонентов", install_selected: "Установить выбранные" },
+            remove: { title: "Удаление компонентов", remove_selected: "Удалить выбранные" },
+            customize: { title: "Настройка компонентов" },
+            backup: { title: "Резервная копия" },
+            tools: { title: "Инструменты" },
+            info: { title: "Информация о приложении" },
+            messages: { connection_success: "Успешно подключено!", connection_error: "Ошибка подключения" }
         };
     } else {
         return {
             nav: { main: "Main", install: "Install", remove: "Remove", customize: "Customize", backup: "Backup", tools: "Tools", info: "Info" },
-            main: { title: "Welcome to Creality Helper", description: "Simple and intuitive control of your Creality 3D printer", connection: "🔌 Connect to printer", ip: "Printer IP address:", port: "Port:", username: "Username:", password: "Password:", connect: "Connect", clear_ssh: "🔑 Clear SSH" },
-            install: { title: "📦 Install Components", description: "Select components to install on your printer", model: "Printer model:", auto_detect: "Auto-detect", selected: "Selected:", select_all: "Select All", select_none: "Deselect All", install_selected: "Install Selected" },
-            remove: { title: "🗑️ Remove Components", description: "Remove installed components from printer" },
-            customize: { title: "⚙️ Customize Components", description: "Configure installed component settings" },
-            backup: { title: "💾 Backup", description: "Create a backup of printer configuration", create: "Create Backup", restore: "Restore from Backup" },
-            tools: { title: "🔧 Tools", description: "Additional tools for working with printer", diagnostic: "🔍 Diagnostic", diagnostic_desc: "Check printer status", update: "🔄 Update", update_desc: "Update printer firmware", logs: "📋 Logs", logs_desc: "View system logs", info: "ℹ️ Info", info_desc: "System information" },
-            info: { title: "ℹ️ Application Information", version: "Version", author: "Author", license: "License", support: "Support" },
-            models: { k1: "K1", "k1-max": "K1 Max", k1c: "K1C", k1se: "K1SE", k1s: "K1S", "ender-3-v3": "Ender-3 V3", "ender-3-v3-se": "Ender-3 V3 SE", "ender-3-v3-ke": "Ender-3 V3 KE", e5m: "Ender 5 Max" },
-            messages: { connection_success: "Successfully connected to printer!", connection_error: "Connection error", model_detected: "Detected model:", model_undefined: "Printer model not detected", select_components: "Select components to install", connect_first: "Connect to printer first", installation_complete: "Installation complete!", backup_created: "Backup created successfully", backup_restored: "Backup restored successfully", connected: "Connected", disconnected: "Disconnected" },
-            categories: { core: "Core", remote: "Remote Control", tools: "Tools", customization: "Customization" }
+            main: { title: "Creality Helper", connection: "Connect to printer", connect: "Connect" },
+            install: { title: "Install Components", install_selected: "Install Selected" },
+            remove: { title: "Remove Components", remove_selected: "Remove Selected" },
+            customize: { title: "Customize Components" },
+            backup: { title: "Backup" },
+            tools: { title: "Tools" },
+            info: { title: "Application Information" },
+            messages: { connection_success: "Successfully connected!", connection_error: "Connection error" }
         };
     }
 }
@@ -178,7 +193,7 @@ function updateLanguage() {
             if (option.value !== 'auto') {
                 option.textContent = t(`models.${option.value}`);
             } else {
-                option.textContent = t('install.auto_detect');
+                option.textContent = t('main.auto_detect');
             }
         });
     }
@@ -190,7 +205,7 @@ function updateLanguage() {
             if (option.value !== 'auto') {
                 option.textContent = t(`models.${option.value}`);
             } else {
-                option.textContent = t('install.auto_detect');
+                option.textContent = t('main.auto_detect');
             }
         });
     }
@@ -355,7 +370,9 @@ async function connectToPrinter() {
                 if (checkScriptsResult.stdout.includes('exists')) {
                     showMessage('Скрипты helper-script найдены на принтере', 'success');
                 } else {
-                    showMessage('Скрипты helper-script не найдены. Они будут загружены при первой установке компонента.', 'info');
+                    showMessage('Скрипты helper-script не найдены. Без них функционал приложения может быть ограничен.', 'warning');
+                    // Offer to bootstrap scripts now via wget
+                    await offerBootstrapScripts();
                 }
             } catch (error) {
                 showMessage('Предупреждение: Не удалось проверить наличие скриптов: ' + error.message, 'warning');
@@ -464,42 +481,17 @@ function showLoading(containerId, message) {
 function getLocalizedText(key) {
     const translation = t(key);
     // If translation is the same as key, it means translation not found
-    if (translation === key) {
-        // Return fallback values for common keys
-        const fallbacks = {
-            'customize.system.printer_model': 'Модель принтера',
-            'customize.system.kernel_version': 'Версия ядра',
-            'customize.system.klipper_version': 'Версия Klipper',
-            'customize.system.moonraker_version': 'Версия Moonraker',
-            'customize.system.fluidd_version': 'Версия Fluidd',
-            'customize.system.mainsail_version': 'Версия Mainsail',
-            'customize.system.os_version': 'Версия системы',
-            'customize.system.architecture': 'Архитектура',
-            'customize.system.uptime': 'Время работы',
-            'customize.system.memory': 'Память',
-            'customize.system.disk': 'Диск',
-            'customize.system.cpu_load': 'Нагрузка CPU',
-            'customize.system.unknown': 'Неизвестно',
-            'customize.system.not_installed': 'Не установлен',
-            'customize.system.active': 'Активен',
-            'customize.system.inactive': 'Неактивен',
-            'customize.system_info': 'Информация о системе',
-            'tools.back': 'Назад',
-            'tools.factory_reset': 'Сброс к заводским настройкам',
-            'models.e5m': 'Ender 5 Max'
-        };
-        return fallbacks[key] || key;
-    }
-    return translation;
+    // Return the key itself as fallback (should be handled by proper translation files)
+    return translation === key ? key : translation;
 }
 
 // Safe ipcRenderer invoke wrapper
 async function safeInvoke(channel, ...args) {
-    if (!ipcRenderer || !ipcRenderer.invoke) {
-        console.error('ipcRenderer is not available');
+    if (!electronAPI || !electronAPI.invoke) {
+        console.error('electronAPI is not available');
         throw new Error('IPC не доступен');
     }
-    return await ipcRenderer.invoke(channel, ...args);
+    return await electronAPI.invoke(channel, ...args);
 }
 
 // Current printer model
@@ -972,14 +964,14 @@ function getFallbackHelpContent() {
 // Load app version from package.json
 async function loadAppVersion() {
     try {
-        const response = await fetch('./package.json');
-        if (response.ok) {
-            const packageData = await response.json();
-            appVersion = packageData.version || '1.0.0';
+        if (electronAPI && electronAPI.getAppVersion) {
+            appVersion = await electronAPI.getAppVersion();
+        } else {
+            appVersion = '0.0.0';
         }
     } catch (error) {
         console.error('Error loading app version:', error);
-        appVersion = '1.0.0';
+        appVersion = '0.0.0';
     }
 }
 
@@ -1019,7 +1011,27 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Check connection status on startup
     checkConnectionStatus();
+    
+    // Run initial self-checks after initial UI setup
+    try { diagnostics.runSelfChecks(); } catch (e) { console.warn('Self-check on init failed:', e.message); }
 });
+
+// -------- Export functions for inline handlers --------
+// Safely attach commonly used functions to window so inline onclick works
+try {
+    const exportsMap = {
+        showPage, setLanguage, changeModel, changeHeaderModel, selectAllComponents, selectNoneComponents,
+        installSelectedComponents, selectAllInstalled, selectNoneInstalled, removeSelectedComponents,
+        connectToPrinter, clearSSHKeys, autoDetectPrinter, showSystemInfo, showLogsViewer, showServiceManager,
+        showFileManager, showNetworkTools, showPerformanceMonitor, createBackup, restoreBackup,
+        preventKlipperUpdates, allowKlipperUpdates, fixGcodePrinting, enableCameraSettings, disableCameraSettings,
+        restartNginx, restartMoonraker, restartKlipper, updateEntware, clearCache, clearLogs, restoreFirmware,
+        factoryReset, closeHelp
+    };
+    Object.keys(exportsMap).forEach(k => { if (typeof exportsMap[k] === 'function') { window[k] = exportsMap[k]; } });
+} catch (e) {
+    console.warn('Export mapping skipped (some functions not yet defined):', e.message);
+}
 
 async function checkConnectionStatus() {
     try {
@@ -1540,25 +1552,8 @@ async function ensureHelperScripts() {
             throw new Error('SSH connection is not working properly');
         }
         
-        // Check if scripts exist in /usr/data/helper-script/
-        const checkResult = await safeInvoke('ssh-exec', 'test -f /usr/data/helper-script/scripts/original_helper.sh && echo "exists" || echo "missing"');
-        
-        if (checkResult.success && checkResult.stdout.includes('exists')) {
-            return true; // Scripts already exist
-        }
-        
-        // Scripts don't exist, need to upload them
-        showMessage('Загрузка скриптов helper-script на принтер...', 'info');
-        
-        // First, create directory structure
-        const mkdirResult = await safeInvoke('ssh-exec', 'mkdir -p /usr/data/helper-script/scripts /usr/data/helper-script/files/fixes /usr/data/helper-script/files/camera-settings /usr/data/helper-script/files/moonraker /usr/data/helper-script/files/fluidd-logos /usr/data/helper-script/files/macros /usr/data/helper-script/files/services');
-        
-        if (!mkdirResult.success) {
-            throw new Error('Failed to create directory structure: ' + mkdirResult.stderr);
-        }
-        
-        // Upload essential scripts to /tmp/ first
-        const tempScripts = [
+        // Check if all essential scripts exist in /usr/data/helper-script/
+        const essentialScripts = [
             'original_helper.sh',
             'tools.sh',
             'check_firmware.sh',
@@ -1567,9 +1562,31 @@ async function ensureHelperScripts() {
             'factory_reset.sh'
         ];
         
+        let missingScripts = [];
+        for (const script of essentialScripts) {
+            const checkResult = await safeInvoke('ssh-exec', `test -f /usr/data/helper-script/scripts/${script} && echo "exists" || echo "missing"`);
+            if (!checkResult.success || checkResult.stdout.includes('missing')) {
+                missingScripts.push(script);
+            }
+        }
+        
+        if (missingScripts.length === 0) {
+            return true; // All scripts exist
+        }
+        
+        // Some scripts are missing, need to upload them
+        showMessage(`Загрузка недостающих скриптов helper-script на принтер... (${missingScripts.length} из ${essentialScripts.length})`, 'info');
+        
+        // First, create directory structure
+        const mkdirResult = await safeInvoke('ssh-exec', 'mkdir -p /usr/data/helper-script/scripts /usr/data/helper-script/files/fixes /usr/data/helper-script/files/camera-settings /usr/data/helper-script/files/moonraker /usr/data/helper-script/files/fluidd-logos /usr/data/helper-script/files/macros /usr/data/helper-script/files/services');
+        
+        if (!mkdirResult.success) {
+            throw new Error('Failed to create directory structure: ' + mkdirResult.stderr);
+        }
+        
         let uploadedCount = 0;
         
-        for (const script of tempScripts) {
+        for (const script of missingScripts) {
             try {
                 // Read file content from local filesystem
                 const fileContent = await safeInvoke('read-file', `scripts/${script}`);
@@ -1608,8 +1625,41 @@ EOF`);
             }
         }
         
+        // Upload component installers if present locally
+        try {
+            // Ensure components directory exists on remote
+            await safeInvoke('ssh-exec', 'mkdir -p /usr/data/helper-script/scripts/components/moonraker-nginx /usr/data/helper-script/scripts/components/fluidd');
+
+            const componentInstallers = [
+                { local: 'scripts/components/moonraker-nginx/install.sh', remote: '/usr/data/helper-script/scripts/components/moonraker-nginx/install.sh' },
+                { local: 'scripts/components/fluidd/install.sh', remote: '/usr/data/helper-script/scripts/components/fluidd/install.sh' },
+            ];
+
+            for (const item of componentInstallers) {
+                try {
+                    const content = await safeInvoke('read-file', item.local);
+                    if (content.success && content.content) {
+                        let up = await safeInvoke('ssh-exec', `cat > ${item.remote} << 'EOF'
+${content.content}
+EOF`);
+                        if (!up.success) {
+                            const base64Content = btoa(unescape(encodeURIComponent(content.content)));
+                            up = await safeInvoke('ssh-exec', `echo '${base64Content}' | base64 -d > ${item.remote}`);
+                        }
+                        if (up.success) {
+                            await safeInvoke('ssh-exec', `chmod +x ${item.remote}`);
+                        }
+                    }
+                } catch (_) {
+                    // ignore if local file not found
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to upload component installers:', e);
+        }
+
         if (uploadedCount > 0) {
-            showMessage(`Скрипты helper-script загружены на принтер! (${uploadedCount}/${tempScripts.length})`, 'success');
+            showMessage(`Скрипты helper-script загружены на принтер! (${uploadedCount}/${missingScripts.length})`, 'success');
             return true;
         } else {
             throw new Error('Failed to upload any scripts');
@@ -1619,6 +1669,87 @@ EOF`);
         console.error('Error ensuring helper scripts:', error);
         showMessage('Предупреждение: Не удалось загрузить скрипты: ' + error.message, 'warning');
         return false; // Return false instead of throwing
+    }
+}
+
+// Offer to bootstrap scripts on the printer via wget archive
+async function offerBootstrapScripts() {
+    try {
+        // Ask user for consent
+        const res = await safeInvoke('show-message', {
+            type: 'warning',
+            buttons: ['Загрузить сейчас', 'Позже'],
+            defaultId: 0,
+            cancelId: 1,
+            title: 'Загрузка скриптов на принтер',
+            message: 'Скрипты helper-script не найдены на принтере.',
+            detail: 'Без предварительной загрузки скриптов функциональность программы может быть нарушена. Выполнить загрузку сейчас?' 
+        });
+        if (!res || res.response !== 0) {
+            return false;
+        }
+
+        // Ask for URL or use default
+        let url = SCRIPTS_ARCHIVE_URL_DEFAULT;
+        if (!url) {
+            try {
+                // Use browser prompt in renderer to get URL from user
+                // Recommend tar.gz for BusyBox
+                url = window.prompt('Укажите URL архива со скриптами (tar.gz предпочтительно):', '');
+            } catch (_) {}
+        }
+
+        // If no URL provided, fallback to local upload method
+        if (!url) {
+            showMessage('URL не указан — выполняю локальную загрузку скриптов...', 'info');
+            return await ensureHelperScripts();
+        }
+
+        showMessage('Загрузка скриптов через wget → tar (без /tmp)...', 'info');
+
+        // Prepare target dir on printer
+        await safeInvoke('ssh-exec', 'mkdir -p /usr/data/helper-script');
+
+        // Attempt streamed extract directly into target (prefer tar.gz)
+        let streamed = await safeInvoke('ssh-exec', `cd /usr/data/helper-script && wget --no-check-certificate "${url}" -O - | tar -xz 2>/dev/null || wget --no-check-certificate "${url}" -O - | tar -x 2>/dev/null`);
+
+        if (!streamed.success) {
+            // Fallback: download into target dir, then extract, then delete
+            const dlPath = '/usr/data/helper-script/scripts.tgz';
+            const dl = await safeInvoke('ssh-exec', `wget --no-check-certificate "${url}" -O ${dlPath}`);
+            if (!dl.success) {
+                showMessage('Не удалось скачать архив. Выполняю локальную загрузку.', 'warning');
+                return await ensureHelperScripts();
+            }
+            const ext = await safeInvoke('ssh-exec', `cd /usr/data/helper-script && tar -xzf ${dlPath} 2>/dev/null || tar -xf ${dlPath} 2>/dev/null && rm -f ${dlPath}`);
+            if (!ext.success) {
+                showMessage('Не удалось распаковать архив. Выполняю локальную загрузку.', 'warning');
+                return await ensureHelperScripts();
+            }
+        }
+
+        // Normalize structure: ensure scripts/ and files/ end up in place
+        await safeInvoke('ssh-exec', [
+            'mkdir -p /usr/data/helper-script/scripts /usr/data/helper-script/files; ',
+            // If extracted root contains helper-script/, sync its children
+            '[ -d "/usr/data/helper-script/helper-script/scripts" ] && cp -r /usr/data/helper-script/helper-script/scripts/* /usr/data/helper-script/scripts/ 2>/dev/null || true; ',
+            '[ -d "/usr/data/helper-script/helper-script/files" ] && cp -r /usr/data/helper-script/helper-script/files/* /usr/data/helper-script/files/ 2>/dev/null || true; ',
+            // Or if scripts/ files placed at root, keep as-is
+            'chmod -R 755 /usr/data/helper-script/scripts 2>/dev/null || true; '
+        ].join(''));
+
+        // Ensure core scripts exist now
+        const check = await safeInvoke('ssh-exec', 'test -f /usr/data/helper-script/scripts/original_helper.sh && test -f /usr/data/helper-script/scripts/install_components.sh && echo ok || echo fail');
+        if (!check.success || !check.stdout.includes('ok')) {
+            showMessage('После загрузки не найдены основные скрипты — выполняю локальную загрузку.', 'warning');
+            return await ensureHelperScripts();
+        }
+
+        showMessage('Скрипты успешно загружены на принтер через wget', 'success');
+        return true;
+    } catch (error) {
+        console.warn('offerBootstrapScripts failed:', error);
+        return false;
     }
 }
 
@@ -1638,6 +1769,12 @@ async function installComponent(componentId) {
     const scriptsAvailable = await ensureHelperScripts();
     if (!scriptsAvailable) {
         throw new Error('Helper scripts are not available. Please check your connection and try again.');
+    }
+    
+    // Double-check that the install_components.sh script exists and is executable
+    const scriptCheck = await safeInvoke('ssh-exec', 'test -x /usr/data/helper-script/scripts/install_components.sh && echo "executable" || echo "not_executable"');
+    if (!scriptCheck.success || scriptCheck.stdout.includes('not_executable')) {
+        throw new Error('Install script is not available or not executable. Please try again.');
     }
     
     // Map component IDs to script names
@@ -1674,7 +1811,15 @@ async function installComponent(componentId) {
     }
     
     // Use the new install_components.sh script
-    const result = await safeInvoke('ssh-exec', `bash /usr/data/helper-script/scripts/install_components.sh install ${scriptName}`);
+    const result = await safeInvoke('ssh-exec', `sh /usr/data/helper-script/scripts/install_components.sh install ${scriptName}`);
+    
+    // Append command output to install log if available
+    if (result.stdout) {
+        addLogEntry('installLogContent', result.stdout, 'info');
+    }
+    if (result.stderr) {
+        addLogEntry('installLogContent', result.stderr, 'error');
+    }
     
     if (!result.success) {
         throw new Error(result.stderr || result.stdout || 'Installation failed');
@@ -1728,10 +1873,19 @@ async function loadInstalledComponents() {
 async function getInstalledComponents() {
     try {
         // Ensure helper scripts are available
-        await ensureHelperScripts();
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        // Double-check that the check_installed.sh script exists and is executable
+        const scriptCheck = await safeInvoke('ssh-exec', 'test -x /usr/data/helper-script/scripts/check_installed.sh && echo "executable" || echo "not_executable"');
+        if (!scriptCheck.success || scriptCheck.stdout.includes('not_executable')) {
+            throw new Error('Check script is not available or not executable. Please try again.');
+        }
         
         // Use the new check_installed.sh script to get all components at once
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/check_installed.sh all');
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/check_installed.sh all');
         
         if (!result.success) {
             throw new Error(result.stderr || 'Failed to check installed components');
@@ -1776,6 +1930,20 @@ async function getInstalledComponents() {
 // Check if a specific component is installed
 async function checkComponentInstalled(component) {
     try {
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            console.warn('Helper scripts are not available for component check');
+            return false;
+        }
+        
+        // Double-check that the check_installed.sh script exists and is executable
+        const scriptCheck = await safeInvoke('ssh-exec', 'test -x /usr/data/helper-script/scripts/check_installed.sh && echo "executable" || echo "not_executable"');
+        if (!scriptCheck.success || scriptCheck.stdout.includes('not_executable')) {
+            console.warn('Check script is not available or not executable for component check');
+            return false;
+        }
+        
         // Map component IDs to script names
         const componentMap = {
             'moonraker-nginx': 'moonraker-nginx',
@@ -1810,7 +1978,7 @@ async function checkComponentInstalled(component) {
         }
         
         // Use the new check_installed.sh script to check installation status
-        const result = await safeInvoke('ssh-exec', `bash /usr/data/helper-script/scripts/check_installed.sh ${scriptName}`);
+        const result = await safeInvoke('ssh-exec', `sh /usr/data/helper-script/scripts/check_installed.sh ${scriptName}`);
         
         return result.stdout.includes('installed');
         
@@ -1992,6 +2160,12 @@ async function removeComponent(componentId) {
         throw new Error('Helper scripts are not available. Please check your connection and try again.');
     }
     
+    // Double-check that the install_components.sh script exists and is executable
+    const scriptCheck = await safeInvoke('ssh-exec', 'test -x /usr/data/helper-script/scripts/install_components.sh && echo "executable" || echo "not_executable"');
+    if (!scriptCheck.success || scriptCheck.stdout.includes('not_executable')) {
+        throw new Error('Install script is not available or not executable. Please try again.');
+    }
+    
     // Map component IDs to script names
     const componentMap = {
         'moonraker-nginx': 'moonraker-nginx',
@@ -2026,7 +2200,15 @@ async function removeComponent(componentId) {
     }
     
     // Use the new install_components.sh script for removal
-    const result = await safeInvoke('ssh-exec', `bash /usr/data/helper-script/scripts/install_components.sh remove ${scriptName}`);
+    const result = await safeInvoke('ssh-exec', `sh /usr/data/helper-script/scripts/install_components.sh remove ${scriptName}`);
+    
+    // Append command output to remove log if available
+    if (result.stdout) {
+        addLogEntry('removeLogContent', result.stdout, 'info');
+    }
+    if (result.stderr) {
+        addLogEntry('removeLogContent', result.stderr, 'error');
+    }
     
     if (!result.success) {
         throw new Error(result.stderr || result.stdout || 'Removal failed');
@@ -2230,31 +2412,40 @@ async function getSystemInfo() {
         
         // Ensure helper scripts are available
         try {
-            await ensureHelperScripts();
+            const scriptsAvailable = await ensureHelperScripts();
+            if (scriptsAvailable) {
+                // Get firmware version using new script
+                try {
+            const firmwareResult = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/check_firmware.sh firmware');
+                    info.firmwareVersion = firmwareResult.stdout.trim() || 'Неизвестно';
+                } catch (e) {
+                    info.firmwareVersion = 'Неизвестно';
+                }
+                
+                // Get Klipper and Moonraker versions using new script
+                try {
+            const klipperResult = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/check_firmware.sh klipper');
+                    info.klipperVersion = klipperResult.stdout.trim() || 'Не установлен';
+                } catch (e) {
+                    info.klipperVersion = 'Не установлен';
+                }
+                
+                try {
+            const moonrakerResult = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/check_firmware.sh moonraker');
+                    info.moonrakerVersion = moonrakerResult.stdout.trim() || 'Не установлен';
+                } catch (e) {
+                    info.moonrakerVersion = 'Не установлен';
+                }
+            } else {
+                console.warn('Helper scripts not available, using fallback values');
+                info.firmwareVersion = 'Неизвестно';
+                info.klipperVersion = 'Не установлен';
+                info.moonrakerVersion = 'Не установлен';
+            }
         } catch (e) {
             console.warn('Could not ensure helper scripts:', e);
-        }
-        
-        // Get firmware version using new script
-        try {
-            const firmwareResult = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/check_firmware.sh firmware');
-            info.firmwareVersion = firmwareResult.stdout.trim() || 'Неизвестно';
-        } catch (e) {
             info.firmwareVersion = 'Неизвестно';
-        }
-        
-        // Get Klipper and Moonraker versions using new script
-        try {
-            const klipperResult = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/check_firmware.sh klipper');
-            info.klipperVersion = klipperResult.stdout.trim() || 'Не установлен';
-        } catch (e) {
             info.klipperVersion = 'Не установлен';
-        }
-        
-        try {
-            const moonrakerResult = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/check_firmware.sh moonraker');
-            info.moonrakerVersion = moonrakerResult.stdout.trim() || 'Не установлен';
-        } catch (e) {
             info.moonrakerVersion = 'Не установлен';
         }
         
@@ -2567,8 +2758,18 @@ async function testConnectivity() {
     output.textContent = 'Тестирование подключения...';
     
     try {
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            output.textContent = 'Скрипты helper-script недоступны. Используем базовые команды...';
+            // Fallback to basic network commands
+            const result = await safeInvoke('ssh-exec', 'ip addr show && echo "---" && ip route show && echo "---" && ping -c 3 8.8.8.8');
+            output.textContent = result.stdout || result.stderr || 'Тест подключения завершен';
+            return;
+        }
+        
         // Use original helper script for connectivity test
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/original_helper.sh network_diagnostics');
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/original_helper.sh network_diagnostics');
         output.textContent = result.stdout || result.stderr || 'Тест подключения завершен';
         
     } catch (error) {
@@ -2722,19 +2923,49 @@ async function restoreBackup() {
 
 // Tool functions
 async function runDiagnostic() {
-    showMessage('Функция диагностики будет добавлена в следующих версиях', 'info');
+    try {
+        // Показ инструментов сети как диагностического раздела
+        showNetworkTools();
+        // И сразу запустить базовую диагностику
+        await runNetworkDiagnostics();
+    } catch (error) {
+        showMessage('Ошибка диагностики: ' + error.message, 'error');
+    }
 }
 
 async function updateFirmware() {
-    showMessage('Функция обновления прошивки будет добавлена в следующих версиях', 'info');
+    try {
+        // Используем оригинальный скрипт: обновление системы (из меню 7 оригинала)
+        const container = document.getElementById('customizeOptions');
+        if (container) {
+            container.innerHTML = '<div class="loading-container"><span class="loading"></span> Обновление системы...</div>';
+        }
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) throw new Error('Скрипты недоступны');
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/original_helper.sh update_system');
+        if (container) {
+            container.innerHTML = `
+                <div class="info-section">
+                    <h3>🔄 Обновление системы</h3>
+                    <div class="raw-output"><pre>${result?.stdout || result?.stderr || 'Команда выполнена'}</pre></div>
+                </div>
+            `;
+        } else {
+            showMessage('Обновление системы выполнено', 'success');
+        }
+    } catch (error) {
+        showMessage('Ошибка обновления: ' + error.message, 'error');
+    }
 }
 
 async function viewLogs() {
-    showMessage('Функция просмотра логов будет добавлена в следующих версиях', 'info');
+    // Открываем готовый просмотрщик логов
+    await showLogsViewer();
 }
 
 async function systemInfo() {
-    showMessage('Функция информации о системе будет добавлена в следующих версиях', 'info');
+    // Показываем раздел Информация о системе
+    await showSystemInfo();
 }
 
 // Help modal functions
@@ -2835,7 +3066,13 @@ async function preventKlipperUpdates() {
     try {
         showLoading('toolsOptions', 'Предотвращение обновления конфигурации Klipper...');
         
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/tools.sh prevent_klipper_updates');
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/tools.sh prevent_klipper_updates');
         
         document.getElementById('toolsOptions').innerHTML = `
             <div class="info-section">
@@ -2866,7 +3103,13 @@ async function allowKlipperUpdates() {
     try {
         showLoading('toolsOptions', 'Разрешение обновления конфигурации Klipper...');
         
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/tools.sh allow_klipper_updates');
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/tools.sh allow_klipper_updates');
         
         document.getElementById('toolsOptions').innerHTML = `
             <div class="info-section">
@@ -2898,7 +3141,13 @@ async function fixGcodePrinting() {
     try {
         showLoading('toolsOptions', 'Исправление печати Gcode файлов из папки...');
         
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/tools.sh fix_gcode_printing');
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/tools.sh fix_gcode_printing');
         
         document.getElementById('toolsOptions').innerHTML = `
             <div class="info-section">
@@ -2930,7 +3179,13 @@ async function enableCameraSettings() {
     try {
         showLoading('toolsOptions', 'Включение настроек камеры в Moonraker...');
         
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/tools.sh enable_camera_settings');
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/tools.sh enable_camera_settings');
         
         document.getElementById('toolsOptions').innerHTML = `
             <div class="info-section">
@@ -2961,7 +3216,13 @@ async function disableCameraSettings() {
     try {
         showLoading('toolsOptions', 'Выключение настроек камеры в Moonraker...');
         
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/tools.sh disable_camera_settings');
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/tools.sh disable_camera_settings');
         
         document.getElementById('toolsOptions').innerHTML = `
             <div class="info-section">
@@ -2993,7 +3254,13 @@ async function restartNginx() {
     try {
         showLoading('toolsOptions', 'Перезапуск сервиса Nginx...');
         
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/tools.sh restart_nginx');
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/tools.sh restart_nginx');
         
         document.getElementById('toolsOptions').innerHTML = `
             <div class="info-section">
@@ -3024,7 +3291,13 @@ async function restartMoonraker() {
     try {
         showLoading('toolsOptions', 'Перезапуск сервиса Moonraker...');
         
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/tools.sh restart_moonraker');
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/tools.sh restart_moonraker');
         
         document.getElementById('toolsOptions').innerHTML = `
             <div class="info-section">
@@ -3055,7 +3328,13 @@ async function restartKlipper() {
     try {
         showLoading('toolsOptions', 'Перезапуск сервиса Klipper...');
         
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/tools.sh restart_klipper');
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/tools.sh restart_klipper');
         
         document.getElementById('toolsOptions').innerHTML = `
             <div class="info-section">
@@ -3087,7 +3366,13 @@ async function updateEntware() {
     try {
         showLoading('toolsOptions', 'Обновление пакетов Entware...');
         
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/tools.sh update_entware');
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/tools.sh update_entware');
         
         document.getElementById('toolsOptions').innerHTML = `
             <div class="info-section">
@@ -3119,7 +3404,13 @@ async function clearCache() {
     try {
         showLoading('toolsOptions', 'Очистка системного кэша...');
         
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/tools.sh clear_cache');
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/tools.sh clear_cache');
         
         // Debug: log the result to see what we're getting
         console.log('Clear cache result:', result);
@@ -3155,7 +3446,13 @@ async function clearLogs() {
     try {
         showLoading('toolsOptions', 'Очистка файлов логов...');
         
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/tools.sh clear_logs');
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/tools.sh clear_logs');
         
         document.getElementById('toolsOptions').innerHTML = `
             <div class="info-section">
@@ -3187,7 +3484,13 @@ async function restoreFirmware() {
     try {
         showLoading('toolsOptions', 'Получение инструкций по восстановлению прошивки...');
         
-        const result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/tools.sh restore_firmware');
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
+        const result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/tools.sh restore_firmware');
         
         document.getElementById('toolsOptions').innerHTML = `
             <div class="info-section">
@@ -3223,10 +3526,16 @@ async function factoryReset() {
     try {
         showLoading('toolsOptions', 'Сброс к заводским настройкам...');
         
+        // Ensure helper scripts are available
+        const scriptsAvailable = await ensureHelperScripts();
+        if (!scriptsAvailable) {
+            throw new Error('Helper scripts are not available. Please check your connection and try again.');
+        }
+        
         // Try to use the standalone factory reset script first
         let result;
         try {
-            result = await safeInvoke('ssh-exec', 'bash /usr/data/helper-script/scripts/factory_reset.sh reset');
+            result = await safeInvoke('ssh-exec', 'sh /usr/data/helper-script/scripts/factory_reset.sh reset');
             if (!result.success) {
                 throw new Error('Factory reset script failed');
             }

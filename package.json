@@ -1,6 +1,6 @@
 {
   "name": "hsgui",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "HSGUI - Helper Script GUI для управления Creality 3D-принтерами",
   "main": "src/main.js",
   "scripts": {
@@ -8,6 +8,9 @@
     "dev": "electron . --dev",
     "build": "electron-builder",
     "dist": "npm run build",
+    "test": "vitest",
+    "test:watch": "vitest -w",
+    "test:coverage": "vitest run --coverage",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac",
@@ -32,7 +35,10 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^28.1.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.9.1",
+    "@vitest/coverage-v8": "^2.1.4",
+    "jsdom": "^24.0.0",
+    "vitest": "^2.1.4"
   },
   "dependencies": {
     "node-ssh": "^13.2.1"

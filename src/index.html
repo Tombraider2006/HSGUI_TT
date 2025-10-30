@@ -11,6 +11,17 @@
         /* Inline styles for dynamic content only */
         .help-modal { display: none; }
         .help-modal.show { display: flex; }
+        /* Dev console & health */
+        .dev-console-toggle { position: fixed; right: 14px; bottom: 14px; z-index: 9999; }
+        .dev-console { position: fixed; right: 14px; bottom: 54px; width: 460px; max-height: 40vh; background: #0b0b0b; color: #e6e6e6; border: 1px solid #333; border-radius: 8px; display: none; flex-direction: column; z-index: 9999; }
+        .dev-console-header { padding: 8px 10px; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 8px; }
+        .dev-console-body { padding: 8px 10px; overflow: auto; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.4; }
+        .log-item.info { color: #cfd8dc; }
+        .log-item.warn { color: #ffd54f; }
+        .log-item.error { color: #ef9a9a; }
+        .health-badge { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .health-badge.ok { background: #4caf50; }
+        .health-badge.bad { background: #f44336; }
     </style>
 </head>
 <body>
@@ -22,12 +33,12 @@
             <div class="status-bar">
                 <div class="status-item">
                     <div class="status-indicator" id="connectionStatus"></div>
-                    <span id="connectionText">Отключен</span>
+                    <span id="connectionText" data-i18n="messages.disconnected">Отключен</span>
                 </div>
                 <div class="status-item">
-                    <span>Модель:</span>
+                    <span data-i18n="main.model_label">Модель:</span>
                     <select id="headerModelSelector" class="header-model-selector" onchange="changeHeaderModel()">
-                        <option value="auto" data-i18n="install.auto_detect">Автоопределение</option>
+                        <option value="auto" data-i18n="main.auto_detect">Автоопределение</option>
                         <option value="k1" data-i18n="models.k1">K1</option>
                         <option value="k1-max" data-i18n="models.k1-max">K1 Max</option>
                         <option value="k1c" data-i18n="models.k1c">K1C</option>
@@ -150,7 +161,7 @@
                     <div style="margin-bottom: 20px;">
                         <label data-i18n="install.model">Модель принтера:</label>
                         <select id="modelSelector" class="model-selector" onchange="changeModel()">
-                            <option value="auto" data-i18n="install.auto_detect">Автоопределение</option>
+                            <option value="auto" data-i18n="main.auto_detect">Автоопределение</option>
                             <option value="k1" data-i18n="models.k1">K1</option>
                             <option value="k1-max" data-i18n="models.k1-max">K1 Max</option>
                             <option value="k1c" data-i18n="models.k1c">K1C</option>
@@ -395,6 +406,19 @@
             </div>
         </div>
     </div>
+
+    <!-- Dev Console UI -->
+    <div class="dev-console" id="devConsole">
+        <div class="dev-console-header">
+            <span class="health-badge ok" id="healthBadge"></span>
+            <strong id="healthText">OK</strong>
+            <span style="margin-left:auto"></span>
+            <button class="btn btn-sm" data-i18n="dev_console.clear" onclick="(function(){ const el=document.getElementById('devConsoleContent'); if(el){ el.textContent=''; } })()">Очистить</button>
+            <button class="btn btn-sm" data-i18n="dev_console.hide" onclick="(function(){ const el=document.getElementById('devConsole'); if(el){ el.style.display='none'; } })()">Скрыть</button>
+        </div>
+        <div class="dev-console-body" id="devConsoleContent"></div>
+    </div>
+    <button class="btn dev-console-toggle" data-i18n="dev_console.toggle" onclick="(function(){ const el=document.getElementById('devConsole'); if(el){ el.style.display = (el.style.display==='flex')?'none':'flex'; if(el.style.display==='flex'){ el.style.display='flex'; } } })()">🧪 Логи</button>
 
     <script src="renderer.js"></script>
 </body>

@@ -431,28 +431,40 @@ remove_component() {
     ok_msg "$component removed successfully!"
 }
 
-# Placeholder functions (to be implemented based on original scripts)
+# Model-aware installers (dispatch to component scripts with model argument)
 install_moonraker_nginx() {
-    info_msg "Installing Moonraker and Nginx (K1/3KE/10SE/E5M)..."
-    # Implementation based on original install_moonraker_nginx function
+    local model="$1"
+    info_msg "Installing Moonraker + Nginx for model: $model"
+    if [ -x "/usr/data/helper-script/scripts/components/moonraker-nginx/install.sh" ]; then
+        sh "/usr/data/helper-script/scripts/components/moonraker-nginx/install.sh" "$model"
+    else
+        error_msg "Component installer not found: components/moonraker-nginx/install.sh"
+    fi
 }
 
 install_moonraker_3v3() {
-    info_msg "Installing Updated Moonraker (3V3)..."
-    # Implementation based on original install_moonraker_3v3 function
+    # For 3V3 we reuse the same component installer but pass explicit model
+    local model="$1"
+    install_moonraker_nginx "$model"
 }
 
 install_fluidd() {
-    info_msg "Installing Fluidd (K1/3KE/10SE/E5M)..."
-    # Implementation based on original install_fluidd function
+    local model="$1"
+    info_msg "Installing Fluidd for model: $model"
+    if [ -x "/usr/data/helper-script/scripts/components/fluidd/install.sh" ]; then
+        sh "/usr/data/helper-script/scripts/components/fluidd/install.sh" "$model"
+    else
+        error_msg "Component installer not found: components/fluidd/install.sh"
+    fi
 }
 
 install_fluidd_3v3() {
-    info_msg "Installing Updated Fluidd (3V3)..."
-    # Implementation based on original install_fluidd_3v3 function
+    # For 3V3 we reuse the same component installer but pass explicit model
+    local model="$1"
+    install_fluidd "$model"
 }
 
-# ... (other placeholder functions)
+# TODO: add more component-specific installers here as their scripts are added under scripts/components/
 
 # Main execution
 case "$1" in
