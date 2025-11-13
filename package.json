@@ -1,6 +1,6 @@
 {
   "name": "hsgui",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "HSGUI - Helper Script GUI для управления Creality 3D-принтерами",
   "main": "src/main.js",
   "scripts": {
